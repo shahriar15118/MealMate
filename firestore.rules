@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // === GLOBAL SAFETY NET (DEFAULT DENY) ===
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // === REUSABLE SECURE PRIMITIVES & HELPERS ===
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.get('email', '') == 'shahriarrahama@gmail.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+
+    // === VALIDATION BLUEPRINTS ===
+
+    // Member Validation Blueprint (The "Anti-Update-Gap" Schema)
+    function isValidMember(data) {
+      return data.keys().hasAll(['name', 'phone', 'joinDate', 'active'])
+          && data.keys().size() <= 8
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+          && data.phone is string && data.phone.size() >= 5 && data.phone.size() <= 20
+          && data.joinDate is string && data.joinDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+          && data.active is bool
+          && (data.get('uid', null) == null || (data.uid is string && data.uid.size() <= 128))
+          && (data.get('email', null) == null || (data.email is string && data.email.size() <= 150));
+    }
+
+    // Meal Validation Blueprint
+    function isValidMeal(data) {
+      return data.keys().hasAll(['memberId', 'memberName', 'date', 'type', 'status', 'createdAt'])
+          && data.keys().size() <= 8
+          && data.memberId is string && data.memberId.size() <= 128
+          && data.memberName is string && data.memberName.size() <= 100
+          && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+          && (data.type == 'lunch' || data.type == 'dinner')
+          && (data.status == 'active' || data.status == 'cancelled')
+          && (data.get('cancelledAt', null) == null || (data.cancelledAt is string && data.cancelledAt.size() <= 100))
+          && data.createdAt is string && data.createdAt.size() <= 100
+          && (data.get('late_cancel', null) == null || data.late_cancel is bool);
+    }
+
+    // Payment Validation Blueprint
+    function isValidPayment(data) {
+      return data.keys().hasAll(['memberId', 'memberName', 'amount', 'date', 'createdAt', 'status'])
+          && data.keys().size() <= 13
+          && data.memberId is string && data.memberId.size() <= 128
+          && data.memberName is string && data.memberName.size() <= 100
+          && (data.amount is int || data.amount is float) && data.amount >= 0
+          && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+          && data.createdAt is string && data.createdAt.size() <= 100
+          && (data.status == 'pending' || data.status == 'confirmed' || data.status == 'rejected')
+          && (data.get('note', null) == null || (data.note is string && data.note.size() <= 400))
+          && (data.get('proofUrl', null) == null || (data.proofUrl is string && data.proofUrl.size() <= 1000))
+          && (data.get('receivedById', null) == null || (data.receivedById is string && data.receivedById.size() <= 128))
+          && (data.get('receivedByName', null) == null || (data.receivedByName is string && data.receivedByName.size() <= 100))
+          && (data.get('verifiedAt', null) == null || (data.verifiedAt is string && data.verifiedAt.size() <= 100))
+          && (data.get('verifiedBy', null) == null || (data.verifiedBy is string && data.verifiedBy.size() <= 100));
+    }
+
+    // Config Validation Blueprint
+    function isValidConfig(data) {
+      return data.keys().hasAll(['mealCost', 'lunchCancelDeadline', 'dinnerCancelDeadline'])
+          && data.keys().size() == 3
+          && (data.mealCost is int || data.mealCost is float) && data.mealCost >= 0
+          && data.lunchCancelDeadline is string && data.lunchCancelDeadline.matches('^\\d{2}:\\d{2}$')
+          && data.dinnerCancelDeadline is string && data.dinnerCancelDeadline.matches('^\\d{2}:\\d{2}$');
+    }
+
+
+    // === COLLECTION RULES ===
+
+    // 1. Members Collection
+    match /members/{memberId} {
+      allow get: if isSignedIn() && isValidId(memberId);
+      allow list: if isSignedIn();
+      
+      allow create: if isSignedIn() 
+                    && isValidId(memberId) 
+                    && isValidMember(incoming());
+                    
+      allow update: if isSignedIn() 
+                    && isValidId(memberId) 
+                    && isValidMember(incoming());
+                    
+      allow delete: if isAdmin() && isValidId(memberId);
+    }
+
+    // 2. Meals Collection
+    match /meals/{mealId} {
+      allow get: if isSignedIn() && isValidId(mealId);
+      allow list: if isSignedIn();
+      
+      allow create: if isSignedIn() 
+                    && isValidId(mealId) 
+                    && isValidMeal(incoming());
+                    
+      allow update: if isSignedIn() 
+                    && isValidId(mealId) 
+                    && isValidMeal(incoming())
+                    && incoming().memberId == existing().memberId
+                    && incoming().createdAt == existing().createdAt;
+                    
+      allow delete: if isAdmin() && isValidId(mealId);
+    }
+
+    // 3. Payments Collection
+    match /payments/{paymentId} {
+      allow get: if isSignedIn() && isValidId(paymentId);
+      allow list: if isSignedIn();
+      
+      allow create: if isSignedIn() 
+                    && isValidId(paymentId) 
+                    && isValidPayment(incoming());
+                    
+      allow update: if isSignedIn() 
+                    && isValidId(paymentId) 
+                    && isValidPayment(incoming())
+                    && incoming().memberId == existing().memberId
+                    && incoming().createdAt == existing().createdAt;
+                    
+      allow delete: if isSignedIn() && isValidId(paymentId);
+    }
+
+    // 4. Settings Configuration Document
+    match /settings/config {
+      allow get: if isSignedIn();
+      allow write: if isSignedIn() && isValidConfig(incoming());
+    }
+  }
+}

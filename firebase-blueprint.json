@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "Member": {
+      "title": "Member",
+      "description": "A member of the bachelor household",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the member"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the member"
+        },
+        "joinDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Join date in YYYY-MM-DD format"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the member is active"
+        }
+      },
+      "required": ["name", "phone", "joinDate", "active"]
+    },
+    "Meal": {
+      "title": "Meal",
+      "description": "A meal track entry for a member",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "description": "ID of the associated member"
+        },
+        "memberName": {
+          "type": "string",
+          "description": "Name of the associated member"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Meal date in YYYY-MM-DD format"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["lunch", "dinner"],
+          "description": "Meal session type"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "cancelled"],
+          "description": "Current status of the meal"
+        },
+        "cancelledAt": {
+          "type": "string",
+          "description": "Timestamp when the meal was cancelled, or null"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the meal was created"
+        },
+        "late_cancel": {
+          "type": "boolean",
+          "description": "Flag indicating if cancelled after the deadline"
+        }
+      },
+      "required": ["memberId", "memberName", "date", "type", "status", "createdAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "A budget payment or deposit",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "description": "Associated member ID"
+        },
+        "memberName": {
+          "type": "string",
+          "description": "Associated member name"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Paid amount in BDT"
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional payment note"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of transaction in YYYY-MM-DD"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the payment record was created"
+        }
+      },
+      "required": ["memberId", "memberName", "amount", "date", "createdAt"]
+    },
+    "Config": {
+      "title": "Config",
+      "description": "Global meal tracker parameters and rule settings",
+      "type": "object",
+      "properties": {
+        "mealCost": {
+          "type": "number",
+          "description": "Price per meal in BDT"
+        },
+        "lunchCancelDeadline": {
+          "type": "string",
+          "description": "HH:MM format deadline for cancelling lunch same-day"
+        },
+        "dinnerCancelDeadline": {
+          "type": "string",
+          "description": "HH:MM format deadline for cancelling dinner same-day"
+        }
+      },
+      "required": ["mealCost", "lunchCancelDeadline", "dinnerCancelDeadline"]
+    }
+  },
+  "firestore": {
+    "/members/{memberId}": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Member records"
+    },
+    "/meals/{mealId}": {
+      "schema": { "$ref": "#/entities/Meal" },
+      "description": "Meal attendance entries"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Financial ledger transactions"
+    },
+    "/settings/config": {
+      "schema": { "$ref": "#/entities/Config" },
+      "description": "Single document for global config settings"
+    }
+  }
+}

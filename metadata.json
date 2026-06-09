@@ -1,0 +1,8 @@
+{
+  "name": "MealMate",
+  "description": "Smart bachelor household meal tracker and ledger system with live deadlines, calendar, roommate dues summary, and offline CSV data exporters.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
